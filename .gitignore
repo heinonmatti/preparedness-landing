@@ -1,0 +1,5 @@
+# Hero-gen working artifacts (keep scripts, ignore renders/backups/blobs)
+scratch/hero-gen/hero.png
+scratch/hero-gen/hero-export.png
+scratch/hero-gen/*.bak-*
+scratch/hero-gen/*.json
