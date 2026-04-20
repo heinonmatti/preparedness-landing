@@ -1,10 +1,19 @@
-"""Patch design/hero.excalidraw: keep bg_landscape, replace all actant images
-with 8 new dark-blueprint PNGs from assets/actants/ scattered as map landmarks.
+"""Patch design/hero.excalidraw: refresh the 8 actant PNGs embedded in the
+file from assets/actants/, WITHOUT disturbing layout the user set in Excalidraw.
 
-Layout philosophy: 1600x900 canvas, actants scattered asymmetrically across
-the contour map like landmarks on a cartographer's survey sketch. Since both
-the contour bg and the new actants share the same navy (#0e1420) + gold
-(#d4a149) palette, no framing is needed — edges blend naturally.
+Behavior:
+  - bg_landscape element + file: untouched.
+  - For each slug, look up its existing element by id (`actant_<slug>`).
+    - If present, preserve x/y/width/height/angle/etc — only swap fileId to
+      point at the freshly-embedded PNG.
+    - If absent (first build, or element was deleted), create a new element
+      at the LAYOUT fallback position below.
+  - Orphaned file entries (no longer referenced by any element) are pruned
+    so the file doesn't bloat on every re-run.
+
+Layout philosophy (fallback only): 1600x900 canvas, actants scattered like
+cartographic landmarks. Shared navy (#0e1420) + gold (#d4a149) palette means
+no framing — edges blend.
 """
 from __future__ import annotations
 import base64
@@ -22,9 +31,10 @@ ACTANTS = ROOT / "assets" / "actants"
 BAK_DIR = ROOT / "scratch" / "hero-gen"
 BAK_DIR.mkdir(parents=True, exist_ok=True)
 
-# Landmark layout across 1600x900. Each slot specifies a visual CENTER (cx, cy)
-# and a max long-side budget. The actant's aspect ratio comes from the cropped
-# PNG; the short side scales proportionally. Element is centered on (cx, cy).
+# Fallback positions used ONLY when a slug has no existing element in the
+# current excalidraw (first build, or user deleted one). Each slot specifies
+# a visual CENTER (cx, cy) and a max long-side budget; aspect ratio comes
+# from the cropped PNG.
 LAYOUT: list[dict] = [
     # slug             cx    cy   max_long_side
     {"slug": "village-house", "cx":  260, "cy":  260, "long": 260},  # upper-left rural
@@ -38,6 +48,10 @@ LAYOUT: list[dict] = [
 ]
 
 
+def elem_id(slug: str) -> str:
+    return f"actant_{slug.replace('-', '_')}"
+
+
 def png_to_data_url(path: Path) -> tuple[str, str, bytes]:
     data = path.read_bytes()
     b64 = base64.b64encode(data).decode()
@@ -46,23 +60,68 @@ def png_to_data_url(path: Path) -> tuple[str, str, bytes]:
     return fid, data_url, data
 
 
+def new_element_from_layout(slot: dict, fid: str, png_path: Path, now_ms: int, seed_base: int) -> dict:
+    """Build a fresh image element at the layout slot's (cx, cy), sized from
+    the PNG's own aspect ratio bounded by slot['long']."""
+    with Image.open(png_path) as im:
+        iw, ih = im.size
+    long_side = slot["long"]
+    if iw >= ih:
+        ew = long_side
+        eh = int(round(long_side * ih / iw))
+    else:
+        eh = long_side
+        ew = int(round(long_side * iw / ih))
+    ex = slot["cx"] - ew // 2
+    ey = slot["cy"] - eh // 2
+    return {
+        "type": "image",
+        "id": elem_id(slot["slug"]),
+        "fileId": fid,
+        "status": "saved",
+        "x": ex,
+        "y": ey,
+        "width": ew,
+        "height": eh,
+        "scale": [1, 1],
+        "crop": None,
+        "angle": 0,
+        "opacity": 100,
+        "strokeColor": "transparent",
+        "backgroundColor": "transparent",
+        "fillStyle": "solid",
+        "strokeWidth": 0,
+        "strokeStyle": "solid",
+        "roughness": 0,
+        "seed": seed_base,
+        "version": 1,
+        "versionNonce": seed_base + 1,
+        "isDeleted": False,
+        "groupIds": [],
+        "boundElements": None,
+        "link": None,
+        "locked": False,
+        "roundness": None,
+    }
+
+
 def main() -> None:
-    # Backup first
     ts = time.strftime("%Y%m%d-%H%M%S")
     bak = BAK_DIR / f"hero.excalidraw.bak-{ts}"
     shutil.copy2(EXCALI, bak)
     print(f"backup: {bak.name}")
 
     doc = json.loads(EXCALI.read_text(encoding="utf-8"))
+    existing_by_id: dict[str, dict] = {
+        e["id"]: e for e in doc["elements"] if e.get("type") == "image"
+    }
 
-    # Keep only the bg_landscape element + its file entry.
     bg_el = next(e for e in doc["elements"] if e.get("id") == "bg_landscape")
     bg_file_id = bg_el["fileId"]
     bg_file = doc["files"][bg_file_id]
 
     new_elements: list[dict] = [bg_el]
     new_files: dict[str, dict] = {bg_file_id: bg_file}
-
     now_ms = int(time.time() * 1000)
 
     for i, slot in enumerate(LAYOUT, start=1):
@@ -72,23 +131,6 @@ def main() -> None:
             raise FileNotFoundError(png_path)
         fid, data_url, raw = png_to_data_url(png_path)
 
-        # Read actual cropped PNG aspect ratio
-        with Image.open(png_path) as im:
-            iw, ih = im.size
-
-        long_side = slot["long"]
-        if iw >= ih:
-            ew = long_side
-            eh = int(round(long_side * ih / iw))
-        else:
-            eh = long_side
-            ew = int(round(long_side * iw / ih))
-
-        # Center on slot center
-        ex = slot["cx"] - ew // 2
-        ey = slot["cy"] - eh // 2
-
-        # File entry
         new_files[fid] = {
             "mimeType": "image/png",
             "id": fid,
@@ -96,44 +138,38 @@ def main() -> None:
             "created": now_ms,
         }
 
-        # Image element — mimic the shape of the existing bg_landscape element
-        seed_base = 200000 + i * 100
-        el_id = f"actant_{slug.replace('-', '_')}"
-        new_elements.append({
-            "type": "image",
-            "id": el_id,
-            "fileId": fid,
-            "status": "saved",
-            "x": ex,
-            "y": ey,
-            "width": ew,
-            "height": eh,
-            "scale": [1, 1],
-            "crop": None,
-            "angle": 0,
-            "opacity": 100,
-            "strokeColor": "transparent",
-            "backgroundColor": "transparent",
-            "fillStyle": "solid",
-            "strokeWidth": 0,
-            "strokeStyle": "solid",
-            "roughness": 0,
-            "seed": seed_base,
-            "version": 1,
-            "versionNonce": seed_base + 1,
-            "isDeleted": False,
-            "groupIds": [],
-            "boundElements": None,
-            "link": None,
-            "locked": False,
-            "roundness": None,
-        })
-        print(f"  [{slug:14s}] fileId={fid[:12]}… png={iw}x{ih} el=({ex},{ey}) {ew}x{eh} bytes={len(raw)}")
+        existing = existing_by_id.get(elem_id(slug))
+        if existing is not None:
+            # Preserve every property the user may have tweaked (x/y/w/h/angle/
+            # scale/crop/opacity). Only swap fileId, mark as saved, bump version.
+            el = dict(existing)
+            el["fileId"] = fid
+            el["status"] = "saved"
+            el["version"] = int(el.get("version", 1)) + 1
+            el["versionNonce"] = (int(el.get("versionNonce", 0)) + 1) & 0x7FFFFFFF
+            new_elements.append(el)
+            print(
+                f"  [{slug:14s}] KEEP pos ({el['x']:.0f},{el['y']:.0f}) "
+                f"{el['width']:.0f}x{el['height']:.0f}  fid={fid[:10]}… bytes={len(raw)}"
+            )
+        else:
+            seed_base = 200000 + i * 100
+            el = new_element_from_layout(slot, fid, png_path, now_ms, seed_base)
+            new_elements.append(el)
+            print(
+                f"  [{slug:14s}] NEW  pos ({el['x']},{el['y']}) "
+                f"{el['width']}x{el['height']}  fid={fid[:10]}… bytes={len(raw)}  (fallback LAYOUT)"
+            )
+
+    # Preserve any non-image elements (arrows, text notes, etc.) the user added
+    for e in doc["elements"]:
+        if e.get("type") == "image":
+            continue
+        new_elements.append(e)
 
     doc["elements"] = new_elements
     doc["files"] = new_files
 
-    # Write back with a newline at end
     EXCALI.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"\npatched: {EXCALI}")
     print(f"elements: {len(new_elements)}, files: {len(new_files)}")
