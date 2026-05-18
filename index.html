@@ -382,6 +382,23 @@
     opacity: 0.55;
     pointer-events: none;
   }
+  .tool-card.coming-soon .eoi-link { pointer-events: auto; }
+
+  .eoi-link {
+    display: inline-block;
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: var(--fs-micro);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ochre);
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--ochre) 35%, transparent);
+    padding-bottom: 2px;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .eoi-link:hover { color: var(--teal); border-color: var(--teal); }
+  .eoi-link:focus-visible { outline: 1px solid var(--teal); outline-offset: 3px; }
 
   /* ----- Footer ----- */
 
@@ -545,6 +562,25 @@
         <div class="tool-card coming-soon" data-reveal>
           <span class="glyph" aria-hidden="true">
             <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 32 C 12 22, 20 18, 34 8"/>
+              <circle cx="7"  cy="30" r="2.2" fill="currentColor"/>
+              <circle cx="16" cy="22" r="2.2" fill="currentColor"/>
+              <circle cx="25" cy="15" r="2.2" fill="currentColor"/>
+              <circle cx="34" cy="8"  r="2.2" fill="currentColor"/>
+            </svg>
+            <span class="ping"></span>
+          </span>
+          <div>
+            <h2>Course – Complex Systems and Behavioural Insights for Preparedness</h2>
+            <p>A training course on the applications of behavioural and complexity sciences for civil preparedness. For people who work in resilience and foresight.</p>
+            <a class="eoi-link" href="https://news.mattiheino.com/?from=preparedness.fi" target="_blank" rel="noopener">Register interest →</a>
+          </div>
+          <span class="badge badge-soon">Soon</span>
+        </div>
+
+        <div class="tool-card coming-soon" data-reveal>
+          <span class="glyph" aria-hidden="true">
+            <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="8" y="6" width="24" height="28" rx="1"/>
               <path d="M12 12 H28 M12 18 H28 M12 24 H22"/>
             </svg>
@@ -586,24 +622,6 @@
           <div>
             <h2>Novel Approaches to Foresight</h2>
             <p>Studying the Future Backwards method for building preparedness through community foresight workshops.</p>
-          </div>
-          <span class="badge badge-soon">Soon</span>
-        </div>
-
-        <div class="tool-card coming-soon" data-reveal>
-          <span class="glyph" aria-hidden="true">
-            <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 32 C 12 22, 20 18, 34 8"/>
-              <circle cx="7"  cy="30" r="2.2" fill="currentColor"/>
-              <circle cx="16" cy="22" r="2.2" fill="currentColor"/>
-              <circle cx="25" cy="15" r="2.2" fill="currentColor"/>
-              <circle cx="34" cy="8"  r="2.2" fill="currentColor"/>
-            </svg>
-            <span class="ping"></span>
-          </span>
-          <div>
-            <h2>Course – Complex Systems and Behavioural Insights for Preparedness</h2>
-            <p>A training course on the applications of behavioural and complexity sciences for civil preparedness. For people who work in resilience and foresight.</p>
           </div>
           <span class="badge badge-soon">Soon</span>
         </div>
